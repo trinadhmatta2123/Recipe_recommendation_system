@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recipe Results</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .recipe { border: 1px solid #ddd; padding: 10px; margin-bottom: 20px; }
+        h2 { color: #444; }
+        .highlight { color: green; }
+    </style>
+</head>
+<body>
+    <h1>Recipe Recommendations</h1>
+    <p><strong>Ingredients entered:</strong> <span class="highlight">{{ user_input }}</span></p>
+    <hr>
+    {% if recipes %}
+        {% for recipe in recipes %}
+        <div class="recipe" data-recipe-id="{{ loop.index }}">
+            <h2 id="name-{{ loop.index }}">{{ recipe["RecipeName"] }}</h2>
+            <p id="ingredients-{{ loop.index }}">
+                <strong>Ingredients:</strong> {{ recipe["TranslatedIngredients"] }}
+            </p>
+            <p id="instructions-{{ loop.index }}">
+                <strong>Instructions:</strong> {{ recipe["TranslatedInstructions"] }}
+            </p>
+            <p><strong>Preparation Time:</strong> {{ recipe["PrepTimeInMins"] }} minutes</p>
+            <p><strong>Servings:</strong> {{ recipe["Servings"] }}</p>
+            <p><strong>Cuisine:</strong> {{ recipe["Cuisine"] }}</p>
+            <p><strong>Diet:</strong> {{ recipe["Diet"] }}</p>
+            <p><strong>Recipe URL:</strong> <a href="{{ recipe["URL"] }}" target="_blank">View Full Recipe</a></p>
+
+            <label for="language-{{ loop.index }}">Choose Language:</label>
+            <select id="language-{{ loop.index }}">
+                <option value="en">English</option>
+                <option value="hi">Hindi</option>
+                <option value="te">Telugu</option>
+                <option value="ta">Tamil</option>
+                <option value="ml">Malayalam</option>
+            </select>
+            <button onclick="translateRecipe({{ loop.index }})">Translate</button>
+            <button onclick="speakRecipe({{ loop.index }})">Speak</button>
+            <button onclick="stopSpeaking()">Stop</button>
+        </div>
+        {% endfor %}
+    {% else %}
+        <p>No recipes found. Try entering different ingredients.</p>
+    {% endif %}
+    <script>
+        let currentUtterance = null;
+
+        async function translateRecipe(recipeId) {
+            const language = document.getElementById(`language-${recipeId}`).value;
+            const name = document.getElementById(`name-${recipeId}`).textContent;
+            const ingredients = document.getElementById(`ingredients-${recipeId}`).textContent;
+            const instructions = document.getElementById(`instructions-${recipeId}`).textContent;
+
+            const response = await fetch("/translate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    recipe: {
+                        RecipeName: name,
+                        TranslatedIngredients: ingredients,
+                        TranslatedInstructions: instructions
+                    },
+                    language: language
+                })
+            });
+
+            const data = await response.json();
+            document.getElementById(`name-${recipeId}`).textContent = data.RecipeName;
+            document.getElementById(`ingredients-${recipeId}`).textContent = `Ingredients: ${data.TranslatedIngredients}`;
+            document.getElementById(`instructions-${recipeId}`).textContent = `Instructions: ${data.TranslatedInstructions}`;
+        }
+
+        function speakRecipe(recipeId) {
+            const name = document.getElementById(`name-${recipeId}`).textContent;
+            const ingredients = document.getElementById(`ingredients-${recipeId}`).textContent;
+            const instructions = document.getElementById(`instructions-${recipeId}`).textContent;
+
+            const language = document.getElementById(`language-${recipeId}`).value;
+
+            const utterance = new SpeechSynthesisUtterance(`${name}. ${ingredients}. ${instructions}.`);
+
+            const voices = window.speechSynthesis.getVoices();
+            const selectedVoice = voices.find(voice => voice.lang === language);
+
+            if (selectedVoice) {
+                utterance.voice = selectedVoice;
+            }
+
+            if (currentUtterance) {
+                window.speechSynthesis.cancel();
+            }
+
+            currentUtterance = utterance;
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function stopSpeaking() {
+            if (currentUtterance) {
+                window.speechSynthesis.cancel();
+                currentUtterance = null;
+            }
+        }
+
+        window.speechSynthesis.onvoiceschanged = () => {
+            const voices = window.speechSynthesis.getVoices();
+            voices.forEach(voice => {
+                console.log(`${voice.name} (${voice.lang})`);
+            });
+        };
+    </script>
+</body>
+</html>
